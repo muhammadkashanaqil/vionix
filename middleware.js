@@ -1,25 +1,29 @@
-// middleware.js (root of Next.js backend)
+// middleware.js (at project root)
 import { NextResponse } from "next/server";
 
-const allowedOrigin = "*"; // or set your React URL: "http://localhost:5173"
+const ALLOWED_ORIGIN = "*"; // or "http://localhost:5173" for your React app
 
-export function middleware(req) {
-  const origin = req.headers.get("origin") || allowedOrigin;
+export function middleware(request) {
+  const origin = request.headers.get("origin") || ALLOWED_ORIGIN;
+
+  // Log to verify middleware runs
+  console.log("[middleware] hit:", request.method, request.nextUrl.pathname);
 
   // Handle CORS preflight
-  if (req.method === "OPTIONS") {
+  if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
       headers: {
         "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Methods":
+          "GET, POST, PUT, PATCH, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        // "Access-Control-Allow-Credentials": "true", // if using cookies
+        // "Access-Control-Allow-Credentials": "true",
       },
     });
   }
 
-  // Let the request go to the route handler
+  // Let the request continue
   const res = NextResponse.next();
 
   // Add CORS headers to ALL API responses
@@ -32,12 +36,12 @@ export function middleware(req) {
     "Access-Control-Allow-Headers",
     "Content-Type, Authorization"
   );
-  // res.headers.set("Access-Control-Allow-Credentials", "true"); // if needed
+  // res.headers.set("Access-Control-Allow-Credentials", "true");
 
   return res;
 }
 
-// Apply only to API routes
+// Apply only to /api routes
 export const config = {
-  matcher: "/api/auth/:path*",
+  matcher: ["/api/:path*"],
 };
