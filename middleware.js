@@ -39,5 +39,5 @@ export function middleware(req) {
 
 // Apply only to API routes
 export const config = {
-  matcher: "/api/:path*",
+  matcher: "/src/app/api/:path*",
 };
