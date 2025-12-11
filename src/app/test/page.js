@@ -27,14 +27,20 @@ export default function Home() {
   }
 
   async function profile() {
-    const res = await fetch("/api/profile");
+    const res = await fetch("/api/profile", {
+      credentials: "include",
+    });
     console.log(await res.json());
   }
 
-  async function logout() {
-    const res = await fetch("/api/auth/logout");
-    console.log(await res.json());
-  }
+ async function logout() {
+  const res = await fetch("/api/auth/logout", {
+    method: "POST",
+    credentials: "include",
+  });
+
+  console.log(await res.json());
+}
 
   return (
     <div>
