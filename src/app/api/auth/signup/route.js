@@ -51,6 +51,63 @@
 
 
 
+// import { dbConnect } from "@/app/lib/mongodb";
+// import bcrypt from "bcryptjs";
+// import jwt from "jsonwebtoken";
+// import { NextResponse } from "next/server";
+
+// export async function POST(req) {
+//   try {
+//     const { name, email, password } = await req.json();
+
+//     if (!name || !email || !password) {
+//       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+//     }
+
+//     const db = await dbConnect();
+//     const users = db.collection("users");
+
+//     const exists = await users.findOne({ email });
+//     if (exists) {
+//       return NextResponse.json({ error: "User already exists" }, { status: 409 });
+//     }
+
+//     const hashed = await bcrypt.hash(password, 10);
+
+//     const result = await users.insertOne({
+//       name,
+//       email,
+//       password: hashed,
+//       createdAt: new Date(),
+//       updatedAt: new Date(),
+//     });
+
+//     const token = jwt.sign(
+//       { id: result.insertedId, email },
+//       process.env.JWT_SECRET,
+//       { expiresIn: "7d" }
+//     );
+
+//     const res = NextResponse.json({
+//       message: "Signup successful",
+//       user: { id: result.insertedId, name, email }
+//     });
+
+//     res.cookies.set("token", token, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === "production",
+//       sameSite: "lax",
+//       path: "/",
+//       maxAge: 60 * 60 * 24 * 7,
+//     });
+
+//     return res;
+//   } catch (err) {
+//     return NextResponse.json({ error: err.message }, { status: 500 });
+//   }
+// }
+
+// app/api/auth/signup/route.js
 import { dbConnect } from "@/app/lib/mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -69,7 +126,10 @@ export async function POST(req) {
 
     const exists = await users.findOne({ email });
     if (exists) {
-      return NextResponse.json({ error: "User already exists" }, { status: 409 });
+      return NextResponse.json(
+        { error: "User already exists" },
+        { status: 409 }
+      );
     }
 
     const hashed = await bcrypt.hash(password, 10);
@@ -78,6 +138,7 @@ export async function POST(req) {
       name,
       email,
       password: hashed,
+      credits: 0,                 // <-- important for your app
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -90,7 +151,7 @@ export async function POST(req) {
 
     const res = NextResponse.json({
       message: "Signup successful",
-      user: { id: result.insertedId, name, email }
+      user: { id: result.insertedId, name, email },
     });
 
     res.cookies.set("token", token, {
