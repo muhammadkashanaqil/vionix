@@ -2,10 +2,11 @@
 // CORS implementation using Proxy API
 import { NextResponse } from "next/server";
 
-const allowedOrigins = ["*"];
+const allowedOrigins = "*";
 // Add more allowed origins depending on your frontend URLs
 
 const corsOptions = {
+  "Access-Control-Allow-Origin":"*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
