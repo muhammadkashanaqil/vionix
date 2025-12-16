@@ -2,7 +2,7 @@
 // CORS implementation using Proxy API
 import { NextResponse } from "next/server";
 
-const allowedOrigins = ["http://localhost:3000", "https://vioniix.vercel.app"];
+const allowedOrigins = '*';
 // Add more allowed origins depending on your frontend URLs
 
 const corsOptions = {
