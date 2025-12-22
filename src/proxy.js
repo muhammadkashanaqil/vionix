@@ -48,31 +48,87 @@
 
 
 // proxy.js
+// import { NextResponse } from "next/server";
+
+// export function proxy(request) {
+//   // Handle preflight
+//   if (request.method === "OPTIONS") {
+//     return new Response(null, {
+//       status: 204,
+//       headers: {
+//         "Access-Control-Allow-Origin": "*",
+//         "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+//         "Access-Control-Allow-Headers": "Content-Type, Authorization",
+//       },
+//     });
+//   }
+
+//   const response = NextResponse.next();
+
+//   response.headers.set("Access-Control-Allow-Origin", "*");
+//   response.headers.set(
+//     "Access-Control-Allow-Methods",
+//     "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+//   );
+//   response.headers.set(
+//     "Access-Control-Allow-Headers",
+//     "Content-Type, Authorization"
+//   );
+
+//   return response;
+// }
+
+// export const config = {
+//   matcher: "/api/:path*",
+// };
+
+
+
+
 import { NextResponse } from "next/server";
 
+const baseHeaders = {
+  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
 export function proxy(request) {
-  // Handle preflight
+  const origin = request.headers.get("origin") || "";
+  const pathname = request.nextUrl.pathname;
+
+  // logout uses cookies → credentials required
+  const needsCredentials = pathname === "/api/auth/logout";
+
+  // Preflight
   if (request.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    });
+    const headers = {
+      ...baseHeaders,
+      ...(needsCredentials
+        ? {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+          }
+        : {
+            "Access-Control-Allow-Origin": "*",
+          }),
+    };
+
+    return new Response(null, { status: 204, headers });
   }
 
   const response = NextResponse.next();
 
-  response.headers.set("Access-Control-Allow-Origin", "*");
-  response.headers.set(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-  );
-  response.headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
+  if (needsCredentials) {
+    response.headers.set("Access-Control-Allow-Origin", origin);
+    response.headers.set("Access-Control-Allow-Credentials", "true");
+    response.headers.set("Vary", "Origin");
+  } else {
+    response.headers.set("Access-Control-Allow-Origin", "*");
+  }
+
+  Object.entries(baseHeaders).forEach(([k, v]) =>
+    response.headers.set(k, v)
   );
 
   return response;
