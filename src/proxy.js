@@ -85,55 +85,109 @@
 
 
 
+// import { NextResponse } from "next/server";
+
+// const baseHeaders = {
+//   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+//   "Access-Control-Allow-Headers": "Content-Type, Authorization",
+// };
+
+// export function proxy(request) {
+//   const origin = request.headers.get("origin") || "";
+//   const pathname = request.nextUrl.pathname;
+
+//   // logout uses cookies → credentials required
+//   const needsCredentials = pathname === "/api/auth/logout";
+
+//   // Preflight
+//   if (request.method === "OPTIONS") {
+//     const headers = {
+//       ...baseHeaders,
+//       ...(needsCredentials
+//         ? {
+//             "Access-Control-Allow-Origin": origin,
+//             "Access-Control-Allow-Credentials": "true",
+//             "Vary": "Origin",
+//           }
+//         : {
+//             "Access-Control-Allow-Origin": "*",
+//           }),
+//     };
+
+//     return new Response(null, { status: 204, headers });
+//   }
+
+//   const response = NextResponse.next();
+
+//   if (needsCredentials) {
+//     response.headers.set("Access-Control-Allow-Origin", origin);
+//     response.headers.set("Access-Control-Allow-Credentials", "true");
+//     response.headers.set("Vary", "Origin");
+//   } else {
+//     response.headers.set("Access-Control-Allow-Origin", "*");
+//   }
+
+//   Object.entries(baseHeaders).forEach(([k, v]) =>
+//     response.headers.set(k, v)
+//   );
+
+//   return response;
+// }
+
+// export const config = {
+//   matcher: "/api/:path*",
+// };
+
+
+// proxy.js
 import { NextResponse } from "next/server";
 
-const baseHeaders = {
+const ALLOWED_ORIGIN = "http://localhost:3000";
+
+const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Credentials": "true",
 };
 
 export function proxy(request) {
-  const origin = request.headers.get("origin") || "";
-  const pathname = request.nextUrl.pathname;
+  const origin = request.headers.get("origin");
+  const isAllowed = origin === ALLOWED_ORIGIN;
 
-  // logout uses cookies → credentials required
-  const needsCredentials = pathname === "/api/auth/logout";
-
-  // Preflight
+  // ✅ Handle preflight (OPTIONS)
   if (request.method === "OPTIONS") {
-    const headers = {
-      ...baseHeaders,
-      ...(needsCredentials
-        ? {
-            "Access-Control-Allow-Origin": origin,
-            "Access-Control-Allow-Credentials": "true",
-            "Vary": "Origin",
-          }
-        : {
-            "Access-Control-Allow-Origin": "*",
-          }),
-    };
-
-    return new Response(null, { status: 204, headers });
+    return new Response(null, {
+      status: 204,
+      headers: {
+        ...(isAllowed && { "Access-Control-Allow-Origin": origin }),
+        ...corsHeaders,
+        "Vary": "Origin",
+      },
+    });
   }
 
+  // ✅ Normal requests
   const response = NextResponse.next();
 
-  if (needsCredentials) {
+  if (isAllowed) {
     response.headers.set("Access-Control-Allow-Origin", origin);
     response.headers.set("Access-Control-Allow-Credentials", "true");
     response.headers.set("Vary", "Origin");
-  } else {
-    response.headers.set("Access-Control-Allow-Origin", "*");
   }
 
-  Object.entries(baseHeaders).forEach(([k, v]) =>
-    response.headers.set(k, v)
+  response.headers.set(
+    "Access-Control-Allow-Methods",
+    corsHeaders["Access-Control-Allow-Methods"]
+  );
+  response.headers.set(
+    "Access-Control-Allow-Headers",
+    corsHeaders["Access-Control-Allow-Headers"]
   );
 
   return response;
 }
 
+// ✅ Apply only to API routes
 export const config = {
   matcher: "/api/:path*",
 };
