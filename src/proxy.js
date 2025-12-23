@@ -142,7 +142,7 @@
 // proxy.js
 import { NextResponse } from "next/server";
 
-const ALLOWED_ORIGIN = ["http://localhost:3000","https://vionix-beta.vercel.app/"];
+const ALLOWED_ORIGIN = "https://vionix-beta.vercel.app/";
 
 const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
