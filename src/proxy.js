@@ -142,9 +142,10 @@
 // proxy.js
 import { NextResponse } from "next/server";
 
-const ALLOWED_ORIGIN = "http://localhost:3000";
+const ALLOWED_ORIGIN = ["http://localhost:3000","https://vionix-beta.vercel.app/"];
 
 const corsHeaders = {
+  // "Access-Control-Allow-Origin":"http://localhost:3000",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Allow-Credentials": "true",
@@ -190,4 +191,5 @@ export function proxy(request) {
 // ✅ Apply only to API routes
 export const config = {
   matcher: "/api/:path*",
+  matcher: "/test2",
 };

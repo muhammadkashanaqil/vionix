@@ -1,96 +1,64 @@
 "use client";
-
 import { useState } from "react";
 
-export default function CreateAdPage() {
-  const [file, setFile] = useState(null);
+export default function Page() {
   const [prompt, setPrompt] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
+  const [file, setFile] = useState(null);
+  const [status, setStatus] = useState("");
 
-  async function onSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    setError("");
-    setResult(null);
+    setStatus("");
 
-    if (!file) return setError("Please upload a product image.");
-    if (!prompt.trim()) return setError("Please write a prompt.");
-
-    setLoading(true);
+    if (!prompt.trim()) return setStatus("Write a prompt");
+    if (!file) return setStatus("Upload an image");
 
     try {
       const form = new FormData();
-      form.append("image", file);              // ✅ binary file
-      form.append("prompt", prompt.trim());    // ✅ text
+      form.append("prompt", prompt.trim());
+      form.append("image", file); // key name: "image"
 
       const res = await fetch("/api/generate", {
         method: "POST",
-        body: form, // ✅ multipart/form-data (browser sets boundary)
+        body: form, // IMPORTANT: don't set Content-Type manually
       });
 
-      const data = await res.json().catch(() => ({}));
+      const text = await res.text(); // n8n might return non-JSON sometimes
+      let data;
+      try { data = JSON.parse(text); } catch { data = { raw: text }; }
 
-      if (!res.ok) {
-        throw new Error(data?.error || `Request failed (${res.status})`);
-      }
+      if (!res.ok) throw new Error(data?.error || text || "Request failed");
 
-      setResult(data);
+      setStatus("✅ Sent to n8n: " + (data?.message || "OK"));
+      console.log("Response:", data);
     } catch (err) {
-      setError(err.message || "Something went wrong.");
-    } finally {
-      setLoading(false);
+      console.error(err);
+      setStatus("❌ " + err.message);
     }
   }
 
   return (
-    <div style={{ maxWidth: 720, margin: "40px auto", padding: 20 }}>
-      <h1>Create New Ad</h1>
+    <form onSubmit={handleSubmit} style={{ padding: 20 }}>
+      <h2>Trigger n8n webhook</h2>
 
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>
-        <label>
-          Product Image
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
-        </label>
+      <input
+        type="text"
+        placeholder="Enter prompt"
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        style={{ width: 400, padding: 8, display: "block", marginBottom: 10 }}
+      />
 
-        <label>
-          Prompt
-          <textarea
-            rows={4}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="e.g. Create a 10s UGC style video ad with upbeat energy..."
-          />
-        </label>
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
+        style={{ display: "block", marginBottom: 10 }}
+      />
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Generating..." : "Generate"}
-        </button>
-      </form>
+      <button type="submit">Send</button>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-
-      {/* Example response handling */}
-      {result && (
-        <div style={{ marginTop: 20 }}>
-          <pre style={{ background: "#f6f6f6", padding: 12, overflow: "auto" }}>
-            {JSON.stringify(result, null, 2)}
-          </pre>
-
-          {/* If n8n returns { videoUrl: "..." } */}
-          {result.videoUrl && (
-            <video
-              src={result.videoUrl}
-              controls
-              style={{ width: "100%", marginTop: 12 }}
-            />
-          )}
-        </div>
-      )}
-    </div>
+      <p style={{ marginTop: 10 }}>{status}</p>
+    </form>
   );
 }
