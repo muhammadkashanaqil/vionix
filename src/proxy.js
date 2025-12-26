@@ -140,12 +140,68 @@
 
 
 // proxy.js
+// import { NextResponse } from "next/server";
+
+// const ALLOWED_ORIGIN = ["http://localhost:3000","https://vionix-beta.vercel.app/"];
+
+// const corsHeaders = {
+//   // "Access-Control-Allow-Origin":"http://localhost:3000",
+//   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+//   "Access-Control-Allow-Headers": "Content-Type, Authorization",
+//   "Access-Control-Allow-Credentials": "true",
+// };
+
+// export function proxy(request) {
+//   const origin = request.headers.get("origin");
+//   const isAllowed = origin === ALLOWED_ORIGIN;
+
+//   // ✅ Handle preflight (OPTIONS)
+//   if (request.method === "OPTIONS") {
+//     return new Response(null, {
+//       status: 204,
+//       headers: {
+//         ...(isAllowed && { "Access-Control-Allow-Origin": origin }),
+//         ...corsHeaders,
+//         "Vary": "Origin",
+//       },
+//     });
+//   }
+
+//   // ✅ Normal requests
+//   const response = NextResponse.next();
+
+//   if (isAllowed) {
+//     response.headers.set("Access-Control-Allow-Origin", origin);
+//     response.headers.set("Access-Control-Allow-Credentials", "true");
+//     response.headers.set("Vary", "Origin");
+//   }
+
+//   response.headers.set(
+//     "Access-Control-Allow-Methods",
+//     corsHeaders["Access-Control-Allow-Methods"]
+//   );
+//   response.headers.set(
+//     "Access-Control-Allow-Headers",
+//     corsHeaders["Access-Control-Allow-Headers"]
+//   );
+
+//   return response;
+// }
+
+// // ✅ Apply only to API routes
+// export const config = {
+//   matcher: "/api/:path*",
+// };
+
+
 import { NextResponse } from "next/server";
 
-const ALLOWED_ORIGIN = ["http://localhost:3000","https://vionix-beta.vercel.app/"];
+const ALLOWED_ORIGINS = [
+  "http://localhost:3000",
+  "https://vionix-beta.vercel.app", // ✅ no trailing slash
+];
 
 const corsHeaders = {
-  // "Access-Control-Allow-Origin":"http://localhost:3000",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Allow-Credentials": "true",
@@ -153,21 +209,20 @@ const corsHeaders = {
 
 export function proxy(request) {
   const origin = request.headers.get("origin");
-  const isAllowed = origin === ALLOWED_ORIGIN;
+  const isAllowed = origin && ALLOWED_ORIGINS.includes(origin); // ✅ FIX
 
-  // ✅ Handle preflight (OPTIONS)
+  // Preflight
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
       headers: {
-        ...(isAllowed && { "Access-Control-Allow-Origin": origin }),
+        ...(isAllowed ? { "Access-Control-Allow-Origin": origin } : {}),
         ...corsHeaders,
-        "Vary": "Origin",
+        Vary: "Origin",
       },
     });
   }
 
-  // ✅ Normal requests
   const response = NextResponse.next();
 
   if (isAllowed) {
@@ -176,20 +231,10 @@ export function proxy(request) {
     response.headers.set("Vary", "Origin");
   }
 
-  response.headers.set(
-    "Access-Control-Allow-Methods",
-    corsHeaders["Access-Control-Allow-Methods"]
-  );
-  response.headers.set(
-    "Access-Control-Allow-Headers",
-    corsHeaders["Access-Control-Allow-Headers"]
-  );
+  response.headers.set("Access-Control-Allow-Methods", corsHeaders["Access-Control-Allow-Methods"]);
+  response.headers.set("Access-Control-Allow-Headers", corsHeaders["Access-Control-Allow-Headers"]);
 
   return response;
 }
 
-// ✅ Apply only to API routes
-export const config = {
-  matcher: "/api/:path*",
-  matcher: "/test2",
-};
+export const config = { matcher: "/api/:path*" };
