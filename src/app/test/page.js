@@ -7,8 +7,8 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: "Kashan A",
-        email: "test@gmail.comm",
-        password: "1234a56",
+        email: "tas",
+        password: "as",
       }),
     });
     console.log(await res.json());
@@ -19,8 +19,8 @@ export default function Home() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: "test@gmail.comm",
-        password: "1234a56",
+        email: "r@gmail.com",
+        password: "Kiet786@",
       }),
     });
     console.log(await res.json());

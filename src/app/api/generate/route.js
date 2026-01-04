@@ -13,17 +13,17 @@ export async function POST(request) {
       );
     }
 
-    // Your n8n webhook URL
-    const n8nWebhookUrl = "https://testtestesttest.app.n8n.cloud/webhook/test";
+    const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL
+      || "https://testtestesttest.app.n8n.cloud/webhook/test";
 
-    // Forward as multipart/form-data to n8n
+    // Forward as multipart/form-data to n8n (same as your working setup)
     const out = new FormData();
     out.append("prompt", prompt);
-    out.append("image", image, image.name); // keep filename
+    out.append("image", image, image.name || "upload.png");
 
     const n8nRes = await fetch(n8nWebhookUrl, {
       method: "POST",
-      body: out, // IMPORTANT: don't set Content-Type manually
+      body: out, // ✅ don't set Content-Type manually
     });
 
     const text = await n8nRes.text();
@@ -37,12 +37,17 @@ export async function POST(request) {
       );
     }
 
-    return NextResponse.json({
-      message: "n8n workflow triggered successfully",
-      n8nResult: parsed,
-    });
+    // ✅ Return n8n response to frontend
+    return NextResponse.json(
+      {
+        ok: true,
+        n8nStatus: n8nRes.status,
+        n8nResult: parsed,
+      },
+      { status: 200 }
+    );
   } catch (err) {
-    console.error("Trigger error:", err);
+    console.error("GENERATE ERROR:", err);
     return NextResponse.json(
       { error: "Failed to trigger n8n webhook", details: String(err?.message || err) },
       { status: 500 }

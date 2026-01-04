@@ -1,64 +1,158 @@
 "use client";
-import { useState } from "react";
 
-export default function Page() {
-  const [prompt, setPrompt] = useState("");
+import { useEffect, useRef, useState } from "react";
+
+export default function Test3Page() {
   const [file, setFile] = useState(null);
+  const [prompt, setPrompt] = useState("");
+
+  const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
+  const [jobId, setJobId] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [credits, setCredits] = useState(null);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setStatus("");
+  const stopRef = useRef(false);
 
-    if (!prompt.trim()) return setStatus("Write a prompt");
-    if (!file) return setStatus("Upload an image");
+  useEffect(() => {
+    stopRef.current = false;
+    refreshCredits();
+    return () => {
+      stopRef.current = true;
+    };
+  }, []);
 
+  async function refreshCredits() {
     try {
-      const form = new FormData();
-      form.append("prompt", prompt.trim());
-      form.append("image", file); // key name: "image"
-
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        body: form, // IMPORTANT: don't set Content-Type manually
-      });
-
-      const text = await res.text(); // n8n might return non-JSON sometimes
-      let data;
-      try { data = JSON.parse(text); } catch { data = { raw: text }; }
-
-      if (!res.ok) throw new Error(data?.error || text || "Request failed");
-
-      setStatus("✅ Sent to n8n: " + (data?.message || "OK"));
-      console.log("Response:", data);
-    } catch (err) {
-      console.error(err);
-      setStatus("❌ " + err.message);
+      const res = await fetch("/api/credits", { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCredits(null);
+        return;
+      }
+      setCredits(data.credits ?? 0);
+    } catch {
+      setCredits(null);
     }
   }
 
-  return (
-    <form onSubmit={handleSubmit} style={{ padding: 20 }}>
-      <h2>Trigger n8n webhook</h2>
+  async function handleGenerate() {
+    stopRef.current = false;
 
-      <input
-        type="text"
-        placeholder="Enter prompt"
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        style={{ width: 400, padding: 8, display: "block", marginBottom: 10 }}
-      />
+    try {
+      setLoading(true);
+      setStatus("");
+      setVideoUrl("");
+      setJobId("");
+
+      if (!file) throw new Error("Please choose an image");
+      if (!prompt.trim()) throw new Error("Please enter a prompt");
+
+      setStatus("Creating job + sending to n8n...");
+
+      // ✅ Send file directly to backend (NO AWS)
+      const form = new FormData();
+      form.append("prompt", prompt.trim());
+      form.append("image", file);
+
+      const createRes = await fetch("/api/ads/create", {
+        method: "POST",
+        body: form, // ✅ multipart
+        credentials: "include",
+      });
+
+      const job = await createRes.json().catch(() => ({}));
+      if (!createRes.ok) throw new Error(job.error || "Create job failed");
+
+      if (!job.jobId) throw new Error("No jobId returned.");
+
+      setJobId(job.jobId);
+
+      if (typeof job.creditsRemaining === "number") {
+        setCredits(job.creditsRemaining);
+      } else {
+        await refreshCredits();
+      }
+
+      setStatus("Processing... (polling)");
+
+      const url = await pollJob(job.jobId);
+      setVideoUrl(url);
+      setStatus("Completed ✅");
+    } catch (e) {
+      setStatus("❌ " + (e?.message || "Something went wrong"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function pollJob(id) {
+    const maxAttempts = 300; // 10 minutes
+
+    for (let i = 1; i <= maxAttempts; i++) {
+      if (stopRef.current) throw new Error("Stopped");
+
+      const res = await fetch(`/api/ads/${id}`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Polling failed (${res.status})`);
+
+      if (data.status === "completed") return data.videoUrl;
+      if (data.status === "failed") throw new Error(data.error || "Job failed");
+
+      setStatus(`Processing... (${data.status || "waiting"}) • ${i}/${maxAttempts}`);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+
+    throw new Error("Timed out waiting for completion");
+  }
+
+  return (
+    <div style={{ padding: 24 }}>
+      <h2>Create Ad (No AWS)</h2>
+
+      <div style={{ marginBottom: 12 }}>
+        <b>Credits:</b> {credits === null ? "—" : credits}
+      </div>
 
       <input
         type="file"
         accept="image/*"
+        disabled={loading}
         onChange={(e) => setFile(e.target.files?.[0] || null)}
-        style={{ display: "block", marginBottom: 10 }}
       />
+      <br /><br />
 
-      <button type="submit">Send</button>
+      <textarea
+        rows={6}
+        style={{ width: 650, maxWidth: "100%" }}
+        value={prompt}
+        disabled={loading}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Enter prompt..."
+      />
+      <br /><br />
 
-      <p style={{ marginTop: 10 }}>{status}</p>
-    </form>
+      <button disabled={loading} onClick={handleGenerate}>
+        {loading ? "Generating..." : "Generate"}
+      </button>
+
+      <p style={{ marginTop: 12 }}>{status}</p>
+
+      {jobId ? (
+        <div style={{ marginTop: 8 }}>
+          <b>Job:</b> <code>{jobId}</code>
+        </div>
+      ) : null}
+
+      {videoUrl ? (
+        <div style={{ marginTop: 16 }}>
+          <video src={videoUrl} controls style={{ width: 650, maxWidth: "100%" }} />
+        </div>
+      ) : null}
+    </div>
   );
 }

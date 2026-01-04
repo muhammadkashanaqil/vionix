@@ -100,6 +100,62 @@
 //   }
 // }
 
+// import { dbConnect } from "@/app/lib/mongodb";
+// import bcrypt from "bcryptjs";
+// import jwt from "jsonwebtoken";
+// import { NextResponse } from "next/server";
+
+// export async function POST(req) {
+//   try {
+//     const { email, password } = await req.json();
+
+//     if (!email || !password) {
+//       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+//     }
+
+//     const db = await dbConnect();
+//     const users = db.collection("users");
+
+//     const user = await users.findOne({ email });
+//     if (!user) {
+//       return NextResponse.json({ error: "User not found" }, { status: 404 });
+//     }
+
+//     const match = await bcrypt.compare(password, user.password);
+//     if (!match) {
+//       return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+//     }
+
+//     const token = jwt.sign(
+//       { id: user._id, email: user.email },
+//       process.env.JWT_SECRET,
+//       { expiresIn: "7d" }
+//     );
+
+//     const res = NextResponse.json({
+//       message: "Login successful",
+//       user: {
+//         id: user._id,
+//         name: user.name,
+//         email: user.email,
+//       },
+//     });
+
+//     // ✅ FIXED COOKIE SETTINGS
+//     res.cookies.set("token", token, {
+//       httpOnly: true,
+//       secure: true,        // MUST be true
+//       sameSite: "none",    // MUST be "none" for cross-origin
+//       path: "/",
+//       maxAge: 60 * 60 * 24 * 7,
+//     });
+
+//     return res;
+//   } catch (err) {
+//     return NextResponse.json({ error: err.message }, { status: 500 });
+//   }
+// }
+
 import { dbConnect } from "@/app/lib/mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -111,6 +167,10 @@ export async function POST(req) {
 
     if (!email || !password) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      return NextResponse.json({ error: "JWT_SECRET is not set" }, { status: 500 });
     }
 
     const db = await dbConnect();
@@ -127,32 +187,41 @@ export async function POST(req) {
     }
 
     const token = jwt.sign(
-      { id: user._id, email: user.email },
+      { id: user._id.toString(), email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    const res = NextResponse.json({
-      message: "Login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
+    const res = NextResponse.json(
+      {
+        message: "Login successful",
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          credits: user.credits ?? 0,
+        },
       },
-    });
+      { status: 200 }
+    );
 
-    // ✅ FIXED COOKIE SETTINGS
+    // ✅ Cookie settings that work on localhost + production
+    const isProd = process.env.NODE_ENV === "production";
+
     res.cookies.set("token", token, {
       httpOnly: true,
-      secure: true,        // MUST be true
-      sameSite: "none",    // MUST be "none" for cross-origin
+      secure: isProd,                 // ✅ true only on https prod
+      sameSite: isProd ? "none" : "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * 7,       // 7 days
     });
 
     return res;
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("LOGIN ERROR:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
-
