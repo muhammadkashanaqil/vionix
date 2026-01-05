@@ -326,15 +326,115 @@
 //   }
 // }
 
-
+// perfect code
 
 // src/app/api/ads/create/route.js
-export const dynamic = 'force-dynamic';
+// export const dynamic = 'force-dynamic';
+
+// import { NextResponse } from "next/server";
+// import { dbConnect } from "@/app/lib/mongodb";
+// import { getUserFromRequest } from "@/app/lib/auth";
+// import { ObjectId } from "mongodb";
+
+// const AD_COST = 15;
+
+// function unwrapDoc(result) {
+//   if (!result) return null;
+//   return result.value ?? result;
+// }
+
+// export async function POST(req) {
+//   try {
+//     const db = await dbConnect();
+//     const user = await getUserFromRequest(req, db);
+
+//     if (!user) {
+//       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+//     }
+
+//     const formData = await req.formData();
+//     const prompt = formData.get("prompt");
+//     const image = formData.get("image");
+
+//     if (!prompt || !image) {
+//       return NextResponse.json({ error: "Missing prompt or image" }, { status: 400 });
+//     }
+
+//     const usersCol = db.collection("users");
+//     const jobsCol = db.collection("ad_jobs");
+
+//     const userId = new ObjectId(user._id);
+
+//     // Deduct credits
+//     const creditResult = await usersCol.findOneAndUpdate(
+//       { _id: userId, credits: { $gte: AD_COST } },
+//       { $inc: { credits: -AD_COST } },
+//       { returnDocument: "after" }
+//     );
+
+//     const updatedUser = unwrapDoc(creditResult);
+//     if (!updatedUser) {
+//       return NextResponse.json({ error: "Not enough credits" }, { status: 402 });
+//     }
+
+//     // Create job in "queued" state
+//     const now = new Date();
+//     const insertResult = await jobsCol.insertOne({
+//       userId,
+//       prompt: String(prompt),
+//       status: "queued",
+//       creditCost: AD_COST,
+//       videoUrl: null,
+//       error: null,
+//       createdAt: now,
+//       updatedAt: now,
+//     });
+
+//     const jobId = insertResult.insertedId.toString();
+
+//     // Fire-and-forget trigger to n8n
+//     const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
+//     if (n8nWebhookUrl) {
+//       const n8nForm = new FormData();
+//       n8nForm.append("prompt", String(prompt));
+//       n8nForm.append("image", image, image.name || "upload.png");
+//       n8nForm.append("jobId", jobId);
+
+//       fetch(n8nWebhookUrl, {
+//         method: "POST",
+//         body: n8nForm,
+//       }).catch((err) => {
+//         console.error("n8n trigger error:", err);
+//       });
+//     } else {
+//       console.error("N8N_WEBHOOK_URL not set");
+//     }
+
+//     // Return immediately - no waiting
+//     return NextResponse.json({
+//       jobId,
+//       status: "queued",
+//       creditsRemaining: updatedUser.credits,
+//     }, { status: 200 });
+//   } catch (err) {
+//     console.error("ADS CREATE ERROR:", err);
+//     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+//   }
+// }
+
+
+
+
+
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { dbConnect } from "@/app/lib/mongodb";
 import { getUserFromRequest } from "@/app/lib/auth";
 import { ObjectId } from "mongodb";
+import { uploadImageToS3 } from "@/app/lib/aws-s3";
 
 const AD_COST = 15;
 
@@ -354,10 +454,13 @@ export async function POST(req) {
 
     const formData = await req.formData();
     const prompt = formData.get("prompt");
-    const image = formData.get("image");
+    const image = formData.get("image"); // File
 
     if (!prompt || !image) {
-      return NextResponse.json({ error: "Missing prompt or image" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing prompt or image" },
+        { status: 400 }
+      );
     }
 
     const usersCol = db.collection("users");
@@ -384,6 +487,8 @@ export async function POST(req) {
       prompt: String(prompt),
       status: "queued",
       creditCost: AD_COST,
+      imageUrl: null, // ✅ add this
+      s3Key: null,    // ✅ optional, helps debugging
       videoUrl: null,
       error: null,
       createdAt: now,
@@ -392,17 +497,55 @@ export async function POST(req) {
 
     const jobId = insertResult.insertedId.toString();
 
-    // Fire-and-forget trigger to n8n
+    // ✅ Upload image to S3 FIRST
+    let imageUrl = null;
+    let s3Key = null;
+
+    try {
+      const uploaded = await uploadImageToS3({
+        file: image,
+        keyPrefix: `ads/${userId.toString()}/${jobId}`,
+      });
+
+      imageUrl = uploaded.imageUrl;
+      s3Key = uploaded.key;
+
+      // save to mongo (optional but recommended)
+      await jobsCol.updateOne(
+        { _id: new ObjectId(jobId) },
+        { $set: { imageUrl, s3Key, updatedAt: new Date() } }
+      );
+    } catch (e) {
+      console.error("S3 upload failed:", e);
+      // If S3 fails, mark job failed (and optionally refund credits if you want)
+      await jobsCol.updateOne(
+        { _id: new ObjectId(jobId) },
+        {
+          $set: {
+            status: "failed",
+            error: "Image upload failed",
+            updatedAt: new Date(),
+          },
+        }
+      );
+
+      return NextResponse.json(
+        { error: "Image upload failed. Try again." },
+        { status: 500 }
+      );
+    }
+
+    // ✅ Fire-and-forget trigger to n8n (send URL, not file)
     const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
     if (n8nWebhookUrl) {
-      const n8nForm = new FormData();
-      n8nForm.append("prompt", String(prompt));
-      n8nForm.append("image", image, image.name || "upload.png");
-      n8nForm.append("jobId", jobId);
-
       fetch(n8nWebhookUrl, {
         method: "POST",
-        body: n8nForm,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: String(prompt),
+          imageUrl, // ✅ important
+          jobId,
+        }),
       }).catch((err) => {
         console.error("n8n trigger error:", err);
       });
@@ -411,11 +554,14 @@ export async function POST(req) {
     }
 
     // Return immediately - no waiting
-    return NextResponse.json({
-      jobId,
-      status: "queued",
-      creditsRemaining: updatedUser.credits,
-    }, { status: 200 });
+    return NextResponse.json(
+      {
+        jobId,
+        status: "queued",
+        creditsRemaining: updatedUser.credits,
+      },
+      { status: 200 }
+    );
   } catch (err) {
     console.error("ADS CREATE ERROR:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
