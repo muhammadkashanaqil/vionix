@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-<<<<<<< HEAD
 // Helper function to extract and convert YouTube watch URLs to embeddable URLs
 function getYouTubeEmbedUrl(url) {
   if (!url) return null;
@@ -18,8 +17,6 @@ function getYouTubeEmbedUrl(url) {
   return null;
 }
 
-=======
->>>>>>> e34186f6942822f1cd4b974da3a459e43538c0e2
 export default function UploadPage() {
   const [prompt, setPrompt] = useState("");
   const [image, setImage] = useState(null);
@@ -58,13 +55,10 @@ export default function UploadPage() {
     }
   };
 
-<<<<<<< HEAD
   // Extract video link if it exists in the response
   const rawVideoUrl = result?.response;
   const embedUrl = getYouTubeEmbedUrl(rawVideoUrl);
 
-=======
->>>>>>> e34186f6942822f1cd4b974da3a459e43538c0e2
   return (
     <main className="max-w-2xl mx-auto p-8">
       <h1 className="text-2xl font-bold mb-6">n8n Image Generator</h1>
@@ -112,7 +106,6 @@ export default function UploadPage() {
       {/* Result Display */}
       {result && (
         <div className="mt-6">
-<<<<<<< HEAD
           <h2 className="text-xl font-semibold mb-3">n8n Response:</h2>
           
           {embedUrl ? (
@@ -136,12 +129,6 @@ export default function UploadPage() {
               {JSON.stringify(result, null, 2)}
             </pre>
           )}
-=======
-          <h2 className="text-xl font-semibold mb-2">n8n Response:</h2>
-          <pre className="bg-gray-100 p-4 rounded overflow-auto max-h-96 text-sm text-black">
-            {JSON.stringify(result, null, 2)}
-          </pre>
->>>>>>> e34186f6942822f1cd4b974da3a459e43538c0e2
         </div>
       )}
     </main>
