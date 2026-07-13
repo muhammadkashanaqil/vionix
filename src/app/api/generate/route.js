@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // import { NextResponse } from "next/server";
 
 // export async function POST(request) {
@@ -72,13 +73,19 @@
 
 
 
+=======
+>>>>>>> e34186f6942822f1cd4b974da3a459e43538c0e2
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
   try {
     const incoming = await request.formData();
     const prompt = incoming.get("prompt");
+<<<<<<< HEAD
     const image = incoming.get("image");
+=======
+    const image = incoming.get("image"); // File
+>>>>>>> e34186f6942822f1cd4b974da3a459e43538c0e2
 
     if (!prompt || !image) {
       return NextResponse.json(
@@ -87,16 +94,24 @@ export async function POST(request) {
       );
     }
 
+<<<<<<< HEAD
     const n8nWebhookUrl =
       process.env.N8N_WEBHOOK_URL ||
       "https://testvionix.app.n8n.cloud/webhook/vionix";
 
+=======
+    const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL
+      || "https://testtestesttest.app.n8n.cloud/webhook/test";
+
+    // Forward as multipart/form-data to n8n (same as your working setup)
+>>>>>>> e34186f6942822f1cd4b974da3a459e43538c0e2
     const out = new FormData();
     out.append("prompt", prompt);
     out.append("image", image, image.name || "upload.png");
 
     const n8nRes = await fetch(n8nWebhookUrl, {
       method: "POST",
+<<<<<<< HEAD
       body: out,
       redirect: "follow",
     });
@@ -115,6 +130,14 @@ export async function POST(request) {
     } catch {
       parsed = { raw: text };
     }
+=======
+      body: out, // ✅ don't set Content-Type manually
+    });
+
+    const text = await n8nRes.text();
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+>>>>>>> e34186f6942822f1cd4b974da3a459e43538c0e2
 
     if (!n8nRes.ok) {
       return NextResponse.json(
@@ -123,6 +146,10 @@ export async function POST(request) {
       );
     }
 
+<<<<<<< HEAD
+=======
+    // ✅ Return n8n response to frontend
+>>>>>>> e34186f6942822f1cd4b974da3a459e43538c0e2
     return NextResponse.json(
       {
         ok: true,
@@ -134,6 +161,7 @@ export async function POST(request) {
   } catch (err) {
     console.error("GENERATE ERROR:", err);
     return NextResponse.json(
+<<<<<<< HEAD
       {
         error: "Failed to trigger n8n webhook",
         details: String(err?.message || err),
@@ -142,3 +170,10 @@ export async function POST(request) {
     );
   }
 }
+=======
+      { error: "Failed to trigger n8n webhook", details: String(err?.message || err) },
+      { status: 500 }
+    );
+  }
+}
+>>>>>>> e34186f6942822f1cd4b974da3a459e43538c0e2
