@@ -656,6 +656,127 @@
 
 
 // src/app/api/ads/create/route.js
+// export const dynamic = 'force-dynamic';
+// export const runtime = 'nodejs';
+
+// import { NextResponse } from "next/server";
+// import { dbConnect } from "@/app/lib/mongodb";
+// import { getUserFromRequest } from "@/app/lib/auth";
+// import { ObjectId } from "mongodb";
+
+// const AD_COST = 15;
+
+// function unwrapDoc(result) {
+//   if (!result) return null;
+//   return result.value ?? result;
+// }
+
+// export async function POST(req) {
+//   try {
+//     const db = await dbConnect();
+//     const user = await getUserFromRequest(req, db);
+
+//     if (!user) {
+//       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+//     }
+
+//     const formData = await req.formData();
+//     const prompt = formData.get("prompt");
+//     const image = formData.get("image"); // This is the File object from client
+
+//     if (!prompt || !image) {
+//       return NextResponse.json(
+//         { error: "Missing prompt or image" },
+//         { status: 400 }
+//       );
+//     }
+
+//     const usersCol = db.collection("users");
+//     const jobsCol = db.collection("ad_jobs");
+
+//     const userId = new ObjectId(user._id);
+
+//     // 1. Deduct credits
+//     const creditResult = await usersCol.findOneAndUpdate(
+//       { _id: userId, credits: { $gte: AD_COST } },
+//       { $inc: { credits: -AD_COST } },
+//       { returnDocument: "after" }
+//     );
+
+//     const updatedUser = unwrapDoc(creditResult);
+//     if (!updatedUser) {
+//       return NextResponse.json({ error: "Not enough credits" }, { status: 402 });
+//     }
+
+//     // 2. Create job in "queued" state (no imageUrl needed since we pass file to n8n)
+//     const now = new Date();
+//     const insertResult = await jobsCol.insertOne({
+//       userId,
+//       prompt: String(prompt),
+//       status: "queued",
+//       creditCost: AD_COST,
+//       imageUrl: null, 
+//       videoUrl: null,
+//       error: null,
+//       createdAt: now,
+//       updatedAt: now,
+//     });
+
+//     const jobId = insertResult.insertedId.toString();
+
+//     // 3. Send the image file DIRECTLY to n8n (no S3 middleman)
+//     const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL ||
+//       "https://testvionix.app.n8n.cloud/webhook/vionix";
+//     if (n8nWebhookUrl) {
+//       const n8nForm = new FormData();
+//       n8nForm.append("prompt", String(prompt));
+//       n8nForm.append("image", image, image.name || "upload.png");
+//       n8nForm.append("jobId", jobId);
+
+//       // Fire-and-forget: n8n works in background, we don't wait for `.then()`
+//       fetch(n8nWebhookUrl, {
+//         method: "POST",
+//         body: n8nForm, // Browser/Node environment sets content-type multipart/form-data automatically
+//       }).catch((err) => {
+//         console.error("n8n trigger error:", err);
+//         // Optional background status update if trigger fails completely
+//         jobsCol.updateOne(
+//           { _id: new ObjectId(jobId) },
+//           { $set: { status: "failed", error: "Could not trigger background worker" } }
+//         ).catch(e => console.error("Failed updating failed status:", e));
+//       });
+//     } else {
+//       console.error("N8N_WEBHOOK_URL not set");
+//     }
+
+//     // 4. Return success response immediately (so the UI updates fast!)
+//     return NextResponse.json(
+//       {
+//         jobId,
+//         status: "queued",
+//         creditsRemaining: updatedUser.credits,
+//       },
+//       { status: 200 }
+//     );
+
+//   } catch (err) {
+//     console.error("ADS CREATE ERROR:", err);
+//     return NextResponse.json(
+//       { error: "Internal server error", details: err.message },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+
+
+
+
+
+
+
+
+// src/app/api/ads/create/route.js
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
@@ -682,7 +803,7 @@ export async function POST(req) {
 
     const formData = await req.formData();
     const prompt = formData.get("prompt");
-    const image = formData.get("image"); // This is the File object from client
+    const image = formData.get("image"); // File object from client
 
     if (!prompt || !image) {
       return NextResponse.json(
@@ -693,7 +814,6 @@ export async function POST(req) {
 
     const usersCol = db.collection("users");
     const jobsCol = db.collection("ad_jobs");
-
     const userId = new ObjectId(user._id);
 
     // 1. Deduct credits
@@ -708,48 +828,59 @@ export async function POST(req) {
       return NextResponse.json({ error: "Not enough credits" }, { status: 402 });
     }
 
-    // 2. Create job in "queued" state (no imageUrl needed since we pass file to n8n)
+    // 2. Create job in "queued" state
     const now = new Date();
     const insertResult = await jobsCol.insertOne({
       userId,
       prompt: String(prompt),
       status: "queued",
       creditCost: AD_COST,
-      imageUrl: null, 
-      videoUrl: null,
-      error: null,
+      imageUrl: "", // Use empty string standard instead of null
+      videoUrl: "", // Use empty string standard instead of null
+      error: "",
       createdAt: now,
       updatedAt: now,
     });
 
     const jobId = insertResult.insertedId.toString();
 
-    // 3. Send the image file DIRECTLY to n8n (no S3 middleman)
-    const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL ||
-      "https://testvionix.app.n8n.cloud/webhook/vionix";
+    // 3. Send the image file DIRECTLY to n8n (AWAIT the trigger!)
+    const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || "https://testvionix.app.n8n.cloud/webhook/vionix";
+    
     if (n8nWebhookUrl) {
       const n8nForm = new FormData();
       n8nForm.append("prompt", String(prompt));
       n8nForm.append("image", image, image.name || "upload.png");
       n8nForm.append("jobId", jobId);
 
-      // Fire-and-forget: n8n works in background, we don't wait for `.then()`
-      fetch(n8nWebhookUrl, {
-        method: "POST",
-        body: n8nForm, // Browser/Node environment sets content-type multipart/form-data automatically
-      }).catch((err) => {
-        console.error("n8n trigger error:", err);
-        // Optional background status update if trigger fails completely
-        jobsCol.updateOne(
+      try {
+        console.log(`🚀 Triggering n8n at: ${n8nWebhookUrl} for Job ID: ${jobId}`);
+        
+        // WE MUST AWAIT THIS call so Vercel doesn't kill the thread prematurely!
+        const n8nResponse = await fetch(n8nWebhookUrl, {
+          method: "POST",
+          body: n8nForm,
+        });
+
+        if (!n8nResponse.ok) {
+          throw new Error(`n8n responded with status: ${n8nResponse.status}`);
+        }
+
+        console.log("✅ n8n background worker triggered successfully");
+      } catch (err) {
+        console.error("❌ Failed to trigger n8n background worker:", err);
+        
+        // Update database state immediately since worker failed to start
+        await jobsCol.updateOne(
           { _id: new ObjectId(jobId) },
           { $set: { status: "failed", error: "Could not trigger background worker" } }
-        ).catch(e => console.error("Failed updating failed status:", e));
-      });
+        );
+      }
     } else {
-      console.error("N8N_WEBHOOK_URL not set");
+      console.error("❌ N8N_WEBHOOK_URL environment variable is missing!");
     }
 
-    // 4. Return success response immediately (so the UI updates fast!)
+    // 4. Return success response immediately
     return NextResponse.json(
       {
         jobId,
