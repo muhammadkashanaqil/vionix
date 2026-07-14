@@ -725,7 +725,8 @@ export async function POST(req) {
     const jobId = insertResult.insertedId.toString();
 
     // 3. Send the image file DIRECTLY to n8n (no S3 middleman)
-    const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
+    const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL ||
+      "https://testvionix.app.n8n.cloud/webhook/vionix";
     if (n8nWebhookUrl) {
       const n8nForm = new FormData();
       n8nForm.append("prompt", String(prompt));
